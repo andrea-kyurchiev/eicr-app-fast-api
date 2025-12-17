@@ -1,17 +1,3 @@
-"""
-EICR Processor
-=========================
-
-A standalone tool for extracting data from EICR PDFs without a GUI.
-Returns data as a Python dictionary/JSON structure.
-
-Usage:
-    from eicr_processor import EICRProcessor
-    
-    processor = EICRProcessor()
-    data = processor.process_pdf("path/to/report.pdf")
-    print(data)
-"""
 
 import sys
 import os
