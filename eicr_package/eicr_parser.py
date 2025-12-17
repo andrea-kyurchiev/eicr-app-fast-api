@@ -2,7 +2,8 @@
 from typing import Optional, Dict, Any
 import re
 from doctr.io import DocumentFile
-# make sure `model` is a doctr OCR predictor you pass in from the calling code
+from datetime import datetime
+
 
 rx_report = re.compile(r"REPORT No:\s*(EICR-[\dA-Za-z\-]+)")
 
@@ -74,7 +75,7 @@ def get_eicr_info(pdf_file: str, model, pages: Optional[list] = None) -> Dict[st
 
     out = _default_output_keys()
 
-    # Page 0 parsing (report number, overall condition, installation block, issued on)
+
     for i, line in enumerate(lines0):
         m = rx_report.search(line)
         if m:
@@ -87,9 +88,9 @@ def get_eicr_info(pdf_file: str, model, pages: Optional[list] = None) -> Dict[st
                 out["Overall Condition"]["value"] = lines0[cond_idx]
                 out["Overall Condition"]["confidence"] = get_confidence_for_line(lines0[cond_idx], page0)
 
-        if 'BS7671:2018+A3:2024' in line:
+        if 'BS7671:2018' in line:
             installation_idx = i + 1
-            # guard indexes
+
             for j, key in enumerate(["Installation Address","Installation Town","Installation County","Installation Postcode"]):
                 idx = installation_idx + j
                 if idx < len(lines0):
@@ -99,10 +100,15 @@ def get_eicr_info(pdf_file: str, model, pages: Optional[list] = None) -> Dict[st
         if 'Issued on' in line:
             issue_idx = i + 1
             if issue_idx < len(lines0):
-                out["Created at"]["value"] = lines0[issue_idx]
-                out["Created at"]["confidence"] = get_confidence_for_line(lines0[issue_idx], page0)
+              created_date_string = lines0[issue_idx]
+              try:
+                datetime.strptime(created_date_string, '%d/%m/%Y')
+                out["Created at"]["value"] = created_date_string
+                out["Inspection Date"]["confidence"] = get_confidence_for_line(created_date_string, page0)
+              except:
+                out["Created at"]["value"] = "-"
+                out["Created at"]["confidence"] = "-"
 
-    # Page 1 parsing: locate section start indices (safe defaults if not found)
     client_start_idx = reason_start_idx = installation_start_idx = extent_start_idx = declaration_start_idx = None
     for i, line in enumerate(lines1):
         up = line.upper()
@@ -165,8 +171,15 @@ def get_eicr_info(pdf_file: str, model, pages: Optional[list] = None) -> Dict[st
             if "Date inspection carried out" in l:
                 idx = i + 2
                 if idx < len(lines1):
-                    out["Inspection Date"]["value"] = lines1[idx]
-                    out["Inspection Date"]["confidence"] = get_confidence_for_line(lines1[idx], page1)
+                  date_string = lines1[idx]
+                  try:
+                    datetime.strptime(date_string, '%d/%m/%Y')
+                    out["Inspection Date"]["value"] = date_string
+                    out["Inspection Date"]["confidence"] = get_confidence_for_line(date_string, page1)
+                  except:
+                    out["Inspection Date"]["value"] = "-"
+                    out["Inspection Date"]["confidence"] = "-"
+                  
 
     # installation details
     if installation_start_idx is not None and extent_start_idx is not None:
@@ -183,5 +196,5 @@ def get_eicr_info(pdf_file: str, model, pages: Optional[list] = None) -> Dict[st
 
     return out
 
-# optional: define __all__ for clarity
+
 __all__ = ["get_eicr_info"]
