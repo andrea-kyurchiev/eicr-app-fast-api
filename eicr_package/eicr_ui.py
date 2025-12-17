@@ -4,9 +4,8 @@ import json
 import os
 import time
 from IPython.display import display
-
-# ---- Import dependencies ----
 from doctr.models import ocr_predictor
+import fitz
 from eicr_package.eicr_parser import get_eicr_info
 from eicr_package.extractor import EICRSupplyExtractor
 from eicr_package.eicr_boards import EICRProcessor
@@ -59,10 +58,21 @@ class EICRProcessorUI:
     
     def _on_upload_change(self, change):
         """Callback to update status when a file is uploaded."""
-        # Check if the new value is not empty (i.e., a file was actually selected)
         if change['new']:
             self.status.value = "<b>Status:</b> File uploaded"
-            
+    
+    def _get_supply_char_page_no(self, pdf_path):
+        doc = fitz.open(pdf_path)
+        s1 = "DETAILS OF THE COMPANY"
+        s2 = "SUPPLY CHARACTERISTICS AND EARTHING ARRANGEMENTS"
+        s3 = "PARTICULARS OF INSTALLATION"
+        for i in range(doc.page_count):
+            text = doc.load_page(i).get_text("text")
+            if s1 in text and s2 in text and s3 in text:
+                target_page_index = i
+                break
+        return target_page_index
+        
     def process_eicr_pdf(self, pdf_path):
         """Internal logic to process the PDF using the package."""
         start_time = time.time()
@@ -71,11 +81,12 @@ class EICRProcessorUI:
 
         eicr_main_record = get_eicr_info(pdf_path, ocr_model)
         self.output_name = eicr_main_record["Report Number"]["value"]
-        
+
+        page_num = self._get_supply_char_page_no(pdf_path)
         extractor = EICRSupplyExtractor(template_path=self.template_path)
         supply_characteristics, particulars_of_installation = extractor.extract(
             pdf_path,
-            page_number=5
+            page_number=page_num
         )
 
         processor = EICRProcessor()
